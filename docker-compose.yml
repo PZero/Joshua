@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  joshua:
+    build: .
+    container_name: joshua_assistant
+    restart: unless-stopped
+    privileged: true # Richiesto per accedere e regolare i controlli audio di sistema (ALSA)
+    network_mode: host # Semplifica la comunicazione con Home Assistant sulla stessa rete locale
+    devices:
+      - "/dev/snd:/dev/snd"         # Accesso a microfono e cassa
+      - "/dev/gpiomem:/dev/gpiomem" # Accesso ai pin GPIO per LED e pulsanti
+    volumes:
+      - ./.env:/app/.env
+      - ./model:/app/model
