@@ -5,7 +5,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     portaudio19-dev \
     libasound2-dev \
-    libasound2-plugins \
     alsa-utils \
     espeak-ng \
     wget \
