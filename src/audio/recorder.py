@@ -19,12 +19,18 @@ class AudioRecorder:
         self.audio_queue = queue.Queue()
         self.stream = None
 
-    def _callback(self, indata, frames, time_info, status):
-        """Callback chiamata da sounddevice per ogni blocco audio catturato."""
+    def _callback_mono(self, indata, frames, time_info, status):
+        """Callback per input mono (1 canale)."""
         if status:
             print(f"Status audio: {status}", flush=True)
-        # La scheda audio ReSpeaker acquisisce obbligatoriamente in stereo (2 canali).
-        # Estraiamo solo il primo canale (mono) per webrtcvad e Vosk.
+        # indata è un array di forma (samples, 1). Lo inseriamo direttamente convertendolo in byte
+        self.audio_queue.put(bytes(indata))
+
+    def _callback_stereo(self, indata, frames, time_info, status):
+        """Callback per input stereo (2 canali). Estrae solo il primo canale."""
+        if status:
+            print(f"Status audio: {status}", flush=True)
+        # Estraiamo solo il primo canale (mono) per webrtcvad e Vosk
         mono_data = indata[:, 0]
         self.audio_queue.put(bytes(mono_data))
 
@@ -42,27 +48,64 @@ class AudioRecorder:
         return None
 
     def start_stream(self):
-        """Avvia la cattura audio continua dal microfono."""
+        """Avvia la cattura audio continua dal microfono con logica di fallback a cascata."""
         self.audio_queue.queue.clear()
         
-        # Cerca l'indice del dispositivo ReSpeaker
+        # Tentativo 1: Default Mono (Sfrutta /etc/asound.conf montato per fare rate-conversion a 16kHz)
+        try:
+            print("[Audio] Tentativo 1: Apertura dispositivo di default in modalità MONO...", flush=True)
+            self.stream = sd.InputStream(
+                device=None,
+                samplerate=self.sample_rate,
+                channels=1,
+                dtype='int16',
+                blocksize=self.frame_samples,
+                callback=self._callback_mono
+            )
+            self.stream.start()
+            print("[Audio] Connesso con successo al dispositivo predefinito (MONO).", flush=True)
+            return
+        except Exception as e:
+            print(f"[Audio] Tentativo 1 fallito (Default Mono): {e}", flush=True)
+
+        # Tentativo 2: Default Stereo (Alcune configurazioni ALSA richiedono stereo anche nel plug)
+        try:
+            print("[Audio] Tentativo 2: Apertura dispositivo di default in modalità STEREO...", flush=True)
+            self.stream = sd.InputStream(
+                device=None,
+                samplerate=self.sample_rate,
+                channels=2,
+                dtype='int16',
+                blocksize=self.frame_samples,
+                callback=self._callback_stereo
+            )
+            self.stream.start()
+            print("[Audio] Connesso con successo al dispositivo predefinito (STEREO).", flush=True)
+            return
+        except Exception as e:
+            print(f"[Audio] Tentativo 2 fallito (Default Stereo): {e}", flush=True)
+
+        # Tentativo 3: Hardware ReSpeaker Diretto (Bypassa ALSA default e interroga direttamente l'hardware)
         device_idx = self._find_respeaker_device_index()
         if device_idx is not None:
-            print(f"[Audio] Utilizzo del dispositivo di acquisizione ReSpeaker (indice {device_idx})", flush=True)
-        else:
-            print("[Audio] ATTENZIONE: ReSpeaker non trovato tra i dispositivi di input, uso del default.", flush=True)
-            device_idx = None
+            try:
+                print(f"[Audio] Tentativo 3: Apertura hardware ReSpeaker diretto (indice {device_idx}, STEREO)...", flush=True)
+                self.stream = sd.InputStream(
+                    device=device_idx,
+                    samplerate=self.sample_rate,
+                    channels=2,
+                    dtype='int16',
+                    blocksize=self.frame_samples,
+                    callback=self._callback_stereo
+                )
+                self.stream.start()
+                print("[Audio] Connesso con successo all'hardware ReSpeaker (STEREO).", flush=True)
+                return
+            except Exception as e:
+                print(f"[Audio] Tentativo 3 fallito (Hardware Diretto): {e}", flush=True)
 
-        # Forziamo a 2 il numero di canali per l'acquisizione hardware (requisito del ReSpeaker HAT)
-        self.stream = sd.InputStream(
-            device=device_idx,
-            samplerate=self.sample_rate,
-            channels=2,
-            dtype='int16',
-            blocksize=self.frame_samples,
-            callback=self._callback
-        )
-        self.stream.start()
+        # Se tutti i tentativi falliscono
+        raise RuntimeError("ERRORE CRITICO: Impossibile aprire un flusso di acquisizione audio valido.")
 
     def stop_stream(self):
         """Arresta la cattura audio."""
