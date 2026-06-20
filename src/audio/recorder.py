@@ -138,6 +138,7 @@ class AudioRecorder:
         num_silent_needed = int(max_silence_seconds / (self.frame_duration_ms / 1000.0))
         
         # Buffer circolare per rilevare l'inizio della frase (10 frame = 300ms)
+        # Memorizziamo tuple di (frame, is_speech)
         start_window = collections.deque(maxlen=10)
         
         speaking = False
@@ -161,13 +162,14 @@ class AudioRecorder:
 
             if not speaking:
                 # Determina se l'utente ha iniziato a parlare
-                start_window.append(is_speech)
+                start_window.append((frame, is_speech))
                 # Se più del 60% della finestra temporale contiene parlato, iniziamo la registrazione
-                if sum(start_window) >= 6:
+                speech_count = sum(1 for f, speech in start_window if speech)
+                if speech_count >= 6:
                     print("[Joshua] Rilevato parlato...", flush=True)
                     speaking = True
                     # Aggiunge i frame accumulati finora per non perdere l'inizio
-                    recorded_audio.extend(start_window)
+                    recorded_audio.extend(f for f, speech in start_window)
             else:
                 recorded_audio.append(frame)
                 
