@@ -129,12 +129,15 @@ def main():
             # Piccolo delay per permettere allo stream e al player di inizializzarsi
             time.sleep(0.15)
 
-            # Monitoriamo il barge-in solo mentre Joshua sta parlando o sta ricevendo dati
+            from src.config import ENABLE_BARGE_IN
+
+            # Monitoriamo il barge-in solo mentre Joshua sta parlando o sta ricevendo dati (se abilitato)
             while (player.is_playing or not player.phrase_queue.empty() or stream_thread.is_alive()) and not stop_barge_in_monitor.is_set():
-                recorder.monitor_for_barge_in(
-                    on_barge_in_callback=trigger_barge_in,
-                    stop_event=stop_barge_in_monitor
-                )
+                if ENABLE_BARGE_IN:
+                    recorder.monitor_for_barge_in(
+                        on_barge_in_callback=trigger_barge_in,
+                        stop_event=stop_barge_in_monitor
+                    )
                 time.sleep(0.05)
 
             # Chiude il monitor in ogni caso
