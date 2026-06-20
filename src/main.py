@@ -39,9 +39,16 @@ def main():
     print("[Joshua] Pronto per le interazioni.", flush=True)
 
     # Avvia la registrazione audio continua in background
-    recorder.start_stream()
-    stt.sample_rate = recorder.sample_rate
-    print(f"[Joshua] Frequenza STT allineata a: {stt.sample_rate}Hz", flush=True)
+    try:
+        recorder.start_stream()
+        stt.sample_rate = recorder.sample_rate
+        print(f"[Joshua] Frequenza STT allineata a: {stt.sample_rate}Hz", flush=True)
+    except RuntimeError as re:
+        print(f"\n[AUDIO CRITICAL ERROR] {re}", flush=True)
+        print("Il container rimarrà attivo per consentire la diagnostica.", flush=True)
+        print("Esegui: docker exec -it joshua_assistant python -m src.diagnose_audio", flush=True)
+        while True:
+            time.sleep(10)
 
     try:
         while True:
