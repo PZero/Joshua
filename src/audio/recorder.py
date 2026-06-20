@@ -23,15 +23,18 @@ class AudioRecorder:
         """Callback chiamata da sounddevice per ogni blocco audio catturato."""
         if status:
             print(f"Status audio: {status}", flush=True)
-        # Inserisce i byte PCM nel queue
-        self.audio_queue.put(bytes(indata))
+        # La scheda audio ReSpeaker acquisisce obbligatoriamente in stereo (2 canali).
+        # Estraiamo solo il primo canale (mono) per webrtcvad e Vosk.
+        mono_data = indata[:, 0]
+        self.audio_queue.put(bytes(mono_data))
 
     def start_stream(self):
         """Avvia la cattura audio continua dal microfono."""
         self.audio_queue.queue.clear()
+        # Forziamo a 2 il numero di canali per l'acquisizione hardware (requisito del ReSpeaker HAT)
         self.stream = sd.InputStream(
             samplerate=self.sample_rate,
-            channels=self.channels,
+            channels=2,
             dtype='int16',
             blocksize=self.frame_samples,
             callback=self._callback
