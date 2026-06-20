@@ -40,6 +40,8 @@ def main():
 
     # Avvia la registrazione audio continua in background
     recorder.start_stream()
+    stt.sample_rate = recorder.sample_rate
+    print(f"[Joshua] Frequenza STT allineata a: {stt.sample_rate}Hz", flush=True)
 
     try:
         while True:
