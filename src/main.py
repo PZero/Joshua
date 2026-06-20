@@ -10,6 +10,13 @@ def main():
     print("==================================================", flush=True)
     print("       JOSHUA - SYSTEM INITIALIZATION             ", flush=True)
     print("==================================================", flush=True)
+    
+    # Diagnostica temporanea per stampare i dispositivi audio visti all'interno di Docker
+    try:
+        import sounddevice as sd
+        print("\n[DIAGNOSTICA] Dispositivi audio rilevati nel container:\n", sd.query_devices(), flush=True)
+    except Exception as diag_err:
+        print(f"\n[DIAGNOSTICA ERROR] Errore di query: {diag_err}", flush=True)
 
     # 1. Inizializzazione di tutti i moduli a livelli
     try:
