@@ -17,6 +17,7 @@ class TTSPlayer:
         self.playing_thread = None
         self.stop_event = threading.Event()
         self.is_playing = False
+        self.thread_active = False
 
         if not self.espeak_exe:
             print("[WARNING] Sintetizzatore 'espeak-ng' o 'espeak' non trovato nel sistema. L'audio non verrà riprodotto.", flush=True)
@@ -30,7 +31,7 @@ class TTSPlayer:
 
     def _play_worker(self):
         """Thread worker che consuma la coda di frasi e le riproduce una alla volta."""
-        self.is_playing = True
+        self.thread_active = True
         while not self.stop_event.is_set():
             try:
                 # Prende la frase dalla coda con un timeout per controllare lo stop_event
@@ -41,8 +42,10 @@ class TTSPlayer:
                 continue
 
             if not self.espeak_exe:
+                self.is_playing = True
                 print(f"[Simulazione Voce Joshua]: {phrase}", flush=True)
                 self.phrase_queue.task_done()
+                self.is_playing = False
                 continue
 
             # Rimuove caratteri speciali non pronunciabili
@@ -52,9 +55,6 @@ class TTSPlayer:
                 continue
 
             # Costruisce il comando espeak-ng
-            # -v: lingua
-            # -p: pitch (altezza voce, default 50, WOPR ha pitch basso tipo 30)
-            # -s: speed (velocità parole al minuto, WOPR è calmo tipo 120-130)
             cmd = [
                 self.espeak_exe,
                 "-v", self.voice,
@@ -64,6 +64,7 @@ class TTSPlayer:
             ]
 
             try:
+                self.is_playing = True
                 # Avvia il processo espeak-ng in background
                 self.current_process = subprocess.Popen(
                     cmd,
@@ -77,12 +78,13 @@ class TTSPlayer:
             finally:
                 self.current_process = None
                 self.phrase_queue.task_done()
+                self.is_playing = False
 
-        self.is_playing = False
+        self.thread_active = False
 
     def start(self):
         """Avvia il thread di riproduzione se non è già attivo."""
-        if not self.is_playing:
+        if not self.thread_active:
             self.stop_event.clear()
             self.playing_thread = threading.Thread(target=self._play_worker, daemon=True)
             self.playing_thread.start()
@@ -114,6 +116,7 @@ class TTSPlayer:
             self.playing_thread = None
         
         self.is_playing = False
+        self.thread_active = False
 
     def play_sync(self, text):
         """Riproduce un testo in modo sincrono (bloccante), utile per il boot."""
