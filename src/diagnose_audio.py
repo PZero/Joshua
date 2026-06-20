@@ -20,13 +20,38 @@ def setup_audio_config():
             print(f"[Audio Warning] Errore nella lettura di /proc/asound/cards: {e}", flush=True)
             
     if card_index is not None:
-        asound_content = f"""# Generato dinamicamente da Joshua (Diagnostica)
+        asound_content = f"""# Generato dinamicamente da Joshua (Diagnostica) con supporto dmix/dsnoop
 pcm.!default {{
+    type asym
+    playback.pcm "playback"
+    capture.pcm "capture"
+}}
+
+pcm.playback {{
     type plug
+    slave.pcm "dmixed"
+}}
+
+pcm.capture {{
+    type plug
+    slave.pcm "array"
+}}
+
+pcm.dmixed {{
+    type dmix
+    slave.pcm "hw:{card_index},0"
+    ipc_key 555555
+    ipc_key_add_uid false
+}}
+
+pcm.array {{
+    type dsnoop
     slave {{
         pcm "hw:{card_index},0"
         channels 2
     }}
+    ipc_key 666666
+    ipc_key_add_uid false
 }}
 """
         try:
