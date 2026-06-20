@@ -22,7 +22,7 @@ class GeminiClient:
         # Inizializza il modello Gemini 1.5 Flash (veloce ed economico per streaming)
         # o un modello più recente se supportato. Flash è perfetto per l'interazione vocale rapida.
         self.model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-2.0-flash",
             system_instruction=SYSTEM_INSTRUCTION
         )
         # Avviamo una chat per mantenere un minimo di contesto durante la sessione
