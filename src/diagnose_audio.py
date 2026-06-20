@@ -1,3 +1,74 @@
+import os
+import sys
+
+def setup_audio_config():
+    card_index = None
+    if os.path.exists("/proc/asound/cards"):
+        try:
+            with open("/proc/asound/cards", "r") as f:
+                content = f.read()
+            for line in content.splitlines():
+                line = line.strip()
+                if "seeed2micvoicec" in line.lower() or "wm8960" in line.lower():
+                    parts = line.split("[")
+                    if parts:
+                        idx_str = parts[0].strip()
+                        if idx_str.isdigit():
+                            card_index = int(idx_str)
+                            break
+        except Exception as e:
+            print(f"[Audio Warning] Errore nella lettura di /proc/asound/cards: {e}", flush=True)
+            
+    if card_index is not None:
+        asound_content = f"""# Generato dinamicamente da Joshua (Diagnostica)
+defaults.pcm.rate_converter "samplerate"
+
+pcm.!default {{
+    type asym
+    playback.pcm "playback"
+    capture.pcm "capture"
+}}
+
+pcm.playback {{
+    type plug
+    slave.pcm "dmixed"
+}}
+
+pcm.capture {{
+    type plug
+    slave.pcm "array"
+}}
+
+pcm.dmixed {{
+    type dmix
+    slave.pcm "hw:{card_index},0"
+    ipc_key 555555
+    ipc_key_add_uid false
+    ipc_perm 0666
+}}
+
+pcm.array {{
+    type dsnoop
+    slave {{
+        pcm "hw:{card_index},0"
+        channels 2
+    }}
+    ipc_key 666666
+    ipc_key_add_uid false
+    ipc_perm 0666
+}}
+"""
+        try:
+            with open("/etc/asound.conf", "w") as f:
+                f.write(asound_content)
+            print(f"[Audio] Generato /etc/asound.conf per la scheda audio indice {card_index}", flush=True)
+        except Exception as e:
+            print(f"[Audio Warning] Impossibile scrivere /etc/asound.conf: {e}", flush=True)
+    else:
+        print("[Audio Warning] Scheda seeed2micvoicec/wm8960 non trovata in /proc/asound/cards. Verranno usati i default di sistema.", flush=True)
+
+setup_audio_config()
+
 import sounddevice as sd
 import numpy as np
 
