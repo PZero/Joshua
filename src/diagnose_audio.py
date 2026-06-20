@@ -39,7 +39,7 @@ pcm.capture {{
 
 pcm.dmixed {{
     type dmix
-    slave.pcm "hw:{card_index},0"
+    slave.pcm "plughw:{card_index},0"
     ipc_key 555555
     ipc_key_add_uid false
     ipc_perm 0666
@@ -48,7 +48,7 @@ pcm.dmixed {{
 pcm.array {{
     type dsnoop
     slave {{
-        pcm "hw:{card_index},0"
+        pcm "plughw:{card_index},0"
         channels 2
     }}
     ipc_key 666666
