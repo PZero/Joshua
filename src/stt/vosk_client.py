@@ -37,3 +37,7 @@ class VoskSTT:
         if text:
             print(f"[STT] Trascrizione: \"{text}\"", flush=True)
         return text
+
+    def create_recognizer(self):
+        """Crea e restituisce un nuovo oggetto KaldiRecognizer per il processing in streaming."""
+        return KaldiRecognizer(self.model, self.sample_rate)

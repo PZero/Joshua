@@ -119,16 +119,27 @@ def main():
             time.sleep(10)
 
     try:
+        import json
         while True:
-            # Ascolta finché l'utente non finisce di parlare
-            audio_bytes = recorder.listen_until_silence()
-            if not audio_bytes:
+            # Riconoscitore Vosk per la frase corrente
+            recognizer = stt.create_recognizer()
+            
+            # Legge lo stream audio in tempo reale
+            has_audio = False
+            for frame in recorder.listen_stream():
+                recognizer.AcceptWaveform(frame)
+                has_audio = True
+                
+            if not has_audio:
                 continue
 
-            # Trascrizione locale
-            text = stt.transcribe(audio_bytes)
+            # Estrae la trascrizione finale immediatamente (latenza post-parlato = 0)
+            result_json = json.loads(recognizer.FinalResult())
+            text = result_json.get("text", "")
             if not text.strip():
                 continue
+            
+            print(f"[STT] Trascrizione: \"{text}\"", flush=True)
 
             # Evento per segnalare l'interruzione al monitor del barge-in
             stop_barge_in_monitor = threading.Event()

@@ -123,6 +123,57 @@ class AudioRecorder:
             self.stream.close()
             self.stream = None
 
+    def listen_stream(self, max_silence_seconds=1.0, phrase_timeout_seconds=15.0):
+        """
+        Ascolta dal microfono in tempo reale. Yielda i frame audio non appena
+        viene rilevato il parlato, fino a quando non rileva il silenzio finale.
+        """
+        print("\n[Joshua] In ascolto...", flush=True)
+        
+        # Pulisce eventuali rimasugli nella coda
+        while not self.audio_queue.empty():
+            self.audio_queue.get_nowait()
+
+        num_silent_needed = int(max_silence_seconds / (self.frame_duration_ms / 1000.0))
+        start_window = collections.deque(maxlen=10)
+        
+        speaking = False
+        silent_count = 0
+        start_time = time.time()
+
+        while True:
+            # Controllo timeout globale per evitare attese infinite se nessuno parla
+            if not speaking and (time.time() - start_time > phrase_timeout_seconds):
+                return
+
+            try:
+                frame = self.audio_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+
+            is_speech = self.vad.is_speech(frame, self.sample_rate)
+
+            if not speaking:
+                start_window.append((frame, is_speech))
+                speech_count = sum(1 for f, speech in start_window if speech)
+                if speech_count >= 6:
+                    print("[Joshua] Rilevato parlato...", flush=True)
+                    speaking = True
+                    # Yielda tutti i frame della finestra iniziale per non perdere l'inizio
+                    for f, speech in start_window:
+                        yield f
+            else:
+                yield frame
+                
+                # Conta i frame silenziosi consecutivi
+                if not is_speech:
+                    silent_count += 1
+                    if silent_count >= num_silent_needed:
+                        print("[Joshua] Fine frase rilevata.", flush=True)
+                        break
+                else:
+                    silent_count = 0
+
     def listen_until_silence(self, max_silence_seconds=1.0, phrase_timeout_seconds=15.0):
         """
         Ascolta dal microfono finché non rileva che l'utente ha iniziato a parlare
