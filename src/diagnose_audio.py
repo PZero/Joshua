@@ -21,8 +21,6 @@ def setup_audio_config():
             
     if card_index is not None:
         asound_content = f"""# Generato dinamicamente da Joshua (Diagnostica)
-defaults.pcm.rate_converter "samplerate"
-
 pcm.!default {{
     type asym
     playback.pcm "playback"
