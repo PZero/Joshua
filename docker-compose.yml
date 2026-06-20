@@ -10,7 +10,8 @@ services:
     devices:
       - "/dev/snd:/dev/snd"         # Accesso a microfono e cassa
       - "/dev/gpiomem:/dev/gpiomem" # Accesso ai pin GPIO per LED e pulsanti
+    ipc: host # Condivide il namespace IPC per consentire ad ALSA dmix/dsnoop di funzionare
     volumes:
       - ./.env:/app/.env
       - ./model:/app/model
-      - /etc/asound.conf:/etc/asound.conf:ro
+      - ./asound.conf:/etc/asound.conf:ro

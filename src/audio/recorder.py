@@ -21,7 +21,7 @@ class AudioRecorder:
         self._buffer = bytearray()
 
     def _callback(self, indata, frames, time_info, status):
-        """Callback unica per l'acquisizione audio. Estrae il mono e bufferizza a 30ms."""
+        """Callback unica per l'acquisizione audio. Estrae il mono, converte a 16-bit e bufferizza a 30ms."""
         if status:
             print(f"Status audio: {status}", flush=True)
         
@@ -33,8 +33,16 @@ class AudioRecorder:
             if len(mono_data.shape) > 1:
                 mono_data = mono_data.squeeze()
                 
+        # Converte a 16-bit PCM se il tipo di dati in ingresso è diverso da int16
+        if mono_data.dtype == np.float32:
+            mono_int16 = (mono_data * 32767.0).astype(np.int16)
+        elif mono_data.dtype == np.int32:
+            mono_int16 = (mono_data >> 16).astype(np.int16)
+        else:
+            mono_int16 = mono_data.astype(np.int16)
+            
         # Converte in byte in modo sicuro (tobytes gestisce anche array non contigui)
-        raw_bytes = mono_data.tobytes()
+        raw_bytes = mono_int16.tobytes()
         self._buffer.extend(raw_bytes)
         
         # Calcola la dimensione del frame in byte (2 byte per campione a 16-bit mono)
@@ -59,7 +67,7 @@ class AudioRecorder:
         return None
 
     def start_stream(self):
-        """Avvia la cattura audio provando tutte le combinazioni di dispositivo, frequenza e canali."""
+        """Avvia la cattura audio provando tutte le combinazioni di dispositivo, frequenza, canali e formato."""
         self.audio_queue.queue.clear()
         self._buffer.clear()
         
@@ -68,18 +76,17 @@ class AudioRecorder:
         devices = [device_idx] if device_idx is not None else []
         devices.append(None) # Fallback su ALSA default
         
-        # Configurazioni da testare (Frequenza, Canali)
+        # Configurazioni da testare (Frequenza, Canali, Dtype)
         # webrtcvad supporta solo 16000 o 48000 (tra quelle compatibili con la ReSpeaker)
-        configs = [
-            (16000, 1),
-            (16000, 2),
-            (48000, 1),
-            (48000, 2)
-        ]
+        configs = []
+        for rate in [16000, 48000]:
+            for channels in [1, 2]:
+                for dtype in ['int16', 'int32', 'float32']:
+                    configs.append((rate, channels, dtype))
         
         for dev in devices:
             dev_label = f"indice {dev}" if dev is not None else "default"
-            for rate, channels in configs:
+            for rate, channels, dtype in configs:
                 try:
                     # Calcola il numero di campioni per un frame da 30ms a questo sample-rate
                     frame_samples = int(rate * self.frame_duration_ms / 1000)
@@ -92,18 +99,18 @@ class AudioRecorder:
                         device=dev,
                         samplerate=rate,
                         channels=channels,
-                        dtype='int16',
+                        dtype=dtype,
                         callback=self._callback
                     )
                     self.stream.start()
                     
                     # Salva la configurazione che ha avuto successo per allineare VAD e STT
                     self.sample_rate = rate
-                    print(f"[Audio] Connessione riuscita su {dev_label} a {rate}Hz ({'MONO' if channels==1 else 'STEREO'})", flush=True)
+                    print(f"[Audio] Connessione riuscita su {dev_label} a {rate}Hz ({'MONO' if channels==1 else 'STEREO'}, {dtype})", flush=True)
                     return
                 except Exception as e:
                     # Stampa un avviso per tracciare i tentativi falliti in diagnostica
-                    print(f"[Audio] Tentativo fallito su {dev_label} a {rate}Hz ({'MONO' if channels==1 else 'STEREO'}): {e}", flush=True)
+                    print(f"[Audio] Tentativo fallito su {dev_label} a {rate}Hz ({'MONO' if channels==1 else 'STEREO'}, {dtype}): {e}", flush=True)
                     self.stream = None
                     
         # Se tutte le combinazioni falliscono
