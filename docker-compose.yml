@@ -13,3 +13,4 @@ services:
     volumes:
       - ./.env:/app/.env
       - ./model:/app/model
+      - /etc/asound.conf:/etc/asound.conf:ro

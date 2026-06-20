@@ -28,11 +28,34 @@ class AudioRecorder:
         mono_data = indata[:, 0]
         self.audio_queue.put(bytes(mono_data))
 
+    def _find_respeaker_device_index(self):
+        """Scansiona i dispositivi PortAudio per trovare l'indice del ReSpeaker HAT."""
+        try:
+            devices = sd.query_devices()
+            for idx, dev in enumerate(devices):
+                name = dev.get('name', '').lower()
+                if "seeed" in name or "wm8960" in name:
+                    if dev.get('max_input_channels', 0) > 0:
+                        return idx
+        except Exception as e:
+            print(f"[Audio] Errore nella ricerca dei dispositivi audio: {e}", flush=True)
+        return None
+
     def start_stream(self):
         """Avvia la cattura audio continua dal microfono."""
         self.audio_queue.queue.clear()
+        
+        # Cerca l'indice del dispositivo ReSpeaker
+        device_idx = self._find_respeaker_device_index()
+        if device_idx is not None:
+            print(f"[Audio] Utilizzo del dispositivo di acquisizione ReSpeaker (indice {device_idx})", flush=True)
+        else:
+            print("[Audio] ATTENZIONE: ReSpeaker non trovato tra i dispositivi di input, uso del default.", flush=True)
+            device_idx = None
+
         # Forziamo a 2 il numero di canali per l'acquisizione hardware (requisito del ReSpeaker HAT)
         self.stream = sd.InputStream(
+            device=device_idx,
             samplerate=self.sample_rate,
             channels=2,
             dtype='int16',
